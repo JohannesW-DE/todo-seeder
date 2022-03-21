@@ -11,14 +11,15 @@ import { getRandomInteger, ITag, ITodo, percent, randomTag, randomTodo, randomUs
 
 // parameters
 
-const USER_COUNT = 2;
+const USER_COUNT = 5;
 
+// chance in percent to "do something"
 const PROBABILITIES_TAGS_CREATION = [90, 70, 10, 1];
 const PROBABILITIES_TAGS_ADD = [40, 10, 1];
 const PROBABILITIES_TODO_CHILDREN = [80, 80, 80, 80, 20, 20]; // add child
 const PROBABILITIES_TODO_DEPTH = [5, 25, 50, 75, 100]; // end at a certain depth
-const PROBABILITIES_FRIENDS = [100, 20];
-const PROBABILITIES_TODO_ADD_USER = [10, 10];
+const PROBABILITIES_FRIENDS = [100, 50];
+const PROBABILITIES_TODO_ADD_USER = [20, 10];
 
 //// sequelize associations
 
