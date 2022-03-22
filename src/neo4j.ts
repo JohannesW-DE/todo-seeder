@@ -20,7 +20,7 @@ const deleteAll = "MATCH (n) DETACH DELETE n"
 
 const createUser = "CREATE (user:User {id: $id, username: $username, name: $name, email: $email}) RETURN user";
 const createTag = "CREATE (tag:Tag {id: $id, name: $name, weight: $weight, color: $color, background: $background}) RETURN tag";
-const createTodo = "CREATE (todo:Todo {id: $id, name: $name, description: $description, moment: datetime($moment), priority: $priority}) RETURN todo";
+const createTodo = "CREATE (todo:Todo {id: $id, name: $name, description: $description, moment: datetime($moment), priority: $priority, checked: $checked}) RETURN todo";
 
 const createUserToTodo = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id = $todoId CREATE (u)-[r:CREATED]->(t) RETURN type(r)";
 const createUserToTag = "MATCH (u:User), (t:Tag) WHERE u.id = $userId AND t.id = $tagId CREATE (u)-[r:CREATED]->(t) RETURN type(r)";
@@ -37,7 +37,6 @@ const createTodoToUser = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id
 
     for (const sequelizeUser of sequelizeUsers) {
       const userJson = sequelizeUser.toJSON();
-      console.log(userJson)
 
       // Create User
       await session.run(createUser,
@@ -71,7 +70,7 @@ const createTodoToUser = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id
 
         todoJson.moment = todoJson.moment.toISOString();
 
-        await session.run(createTodo, {id: neo4j.int(todoJson.id), name: todoJson.name, description: todoJson.description, moment: todoJson.moment, priority: neo4j.int(todoJson.priority)});
+        await session.run(createTodo, {id: neo4j.int(todoJson.id), name: todoJson.name, description: todoJson.description, moment: todoJson.moment, checked: todoJson.checked, priority: neo4j.int(todoJson.priority)});
         await session.run(createUserToTodo, {userId: userJson.id, todoId: todoJson.id});      
       }
 
@@ -80,8 +79,6 @@ const createTodoToUser = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id
         const todoJson = sequelizeTodo.toJSON();
 
         if (todoJson.parent_id !== null) {
-          console.log(todoJson.parent_id + " -> " + todoJson.id);
-
           await session.run(createTodoToTodo, {parentId: todoJson.parent_id, childId: todoJson.id});  
         }
         
