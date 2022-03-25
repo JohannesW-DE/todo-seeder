@@ -12,7 +12,7 @@ import { Meeting } from './sequelize/models/Meeting';
 
 // parameters
 
-const USER_COUNT = 2;
+const USER_COUNT = 5;
 
 // chance in percent to "do something"
 const PROBABILITIES_TAGS_CREATION = [90, 70, 10, 1];
@@ -22,7 +22,7 @@ const PROBABILITIES_TODO_DEPTH = [5, 25, 50, 75, 100]; // end at a certain depth
 const PROBABILITIES_FRIENDS = [100, 50];
 const PROBABILITIES_TODO_ADD_USER = [20, 10];
 const PROBABILITIES_MEETING_ADD_USER = [100, 90, 80, 70, 30];
-const PROBABILITY_TODO_IS_A_MEETING = 50; // TODO: lower
+const PROBABILITY_TODO_IS_A_MEETING = 15; // TODO: lower
 
 //// sequelize associations
 
@@ -59,7 +59,6 @@ WITH RECURSIVE cte (\`id\`, \`name\`, \`checked\`, \`parent_id\`, \`todo_id\`) A
 
 SELECT COUNT(*) AS \`meeting_ascendants\` FROM \`cte\` WHERE \`cte\`.\`id\` != :id AND \`cte\`.\`todo_id\` IS NOT NULL
 `;
-
 
 //// creation
 
