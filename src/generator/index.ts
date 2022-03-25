@@ -20,9 +20,17 @@ export interface ITag {
   background: string;
 }
 
-// 1, 100 -> 1 to 100
+export interface IMeeting {
+  venue: string;
+  duration: number;
+  user_limit: number;
+}
+
+// minimun and maximum are inclusive
 export function getRandomInteger(min: number, max: number): number {
-  return Math.floor(Math.random() * max + min);
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
 // helpers
@@ -59,7 +67,7 @@ export function randomUsers({length}: {length: number}): User[] {
 
 // prefer adjectives
 export function randomTag(): ITag {
-  const tag = {
+  const tag: ITag = {
     name: percent({percentage: 75}) ? faker.word.adjective(): faker.word.noun(),
     weight: getRandomInteger(1, 10),
     color: randHex(),
@@ -67,4 +75,15 @@ export function randomTag(): ITag {
   }
   
   return tag;
+}
+
+// only the new properties
+export function randomMeeting(): IMeeting {
+  const meeting: IMeeting = {
+    venue: `${titleCase(faker.word.noun())} ${faker.word.noun()}`,
+    duration: getRandomInteger(30, 120),
+    user_limit: getRandomInteger(5, 10),
+  }
+
+  return meeting;
 }

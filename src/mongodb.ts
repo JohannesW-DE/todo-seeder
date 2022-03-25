@@ -1,5 +1,6 @@
 import { connect, Types } from "mongoose";
 import { MongooseUser } from "./mongoose/models/User";
+import { Meeting } from "./sequelize/models/Meeting";
 import { Tag } from "./sequelize/models/Tag";
 import { Todo } from "./sequelize/models/Todo";
 import { TodoTag } from "./sequelize/models/TodoTag";
@@ -64,6 +65,16 @@ connect(process.env.MONGODB_URI!);
 
       if (todoJson.parent_id !== null) {
         todoJson.parent = todoIds[todoJson.parent_id]
+      }
+
+      // check for meeting and possibly add properties
+      const sequelizeMeeting = await Meeting.findByPk(todoJson.id);
+      if (sequelizeMeeting) {
+        const meetingJson = sequelizeMeeting.toJSON();
+
+        todoJson.venue = meetingJson.venue;
+        todoJson.duration = meetingJson.duration;
+        todoJson.user_limit = meetingJson.user_limit;
       }
 
       // Add Tags

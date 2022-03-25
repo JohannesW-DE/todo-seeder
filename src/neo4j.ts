@@ -1,5 +1,6 @@
 import neo4j from 'neo4j-driver'
 import { Op } from 'sequelize/types';
+import { Meeting } from './sequelize/models/Meeting';
 import { Tag } from './sequelize/models/Tag';
 import { Todo } from './sequelize/models/Todo';
 import { TodoTag } from './sequelize/models/TodoTag';
@@ -21,6 +22,7 @@ const deleteAll = "MATCH (n) DETACH DELETE n"
 const createUser = "CREATE (user:User {id: $id, username: $username, name: $name, email: $email}) RETURN user";
 const createTag = "CREATE (tag:Tag {id: $id, name: $name, weight: $weight, color: $color, background: $background}) RETURN tag";
 const createTodo = "CREATE (todo:Todo {id: $id, name: $name, description: $description, moment: datetime($moment), priority: $priority, checked: $checked}) RETURN todo";
+const createMeeting = "CREATE (todo:Todo:Meeting {id: $id, name: $name, description: $description, moment: datetime($moment), priority: $priority, checked: $checked, venue: $venue, duration: $duration, user_limit:$user_limit}) RETURN todo";
 
 const createUserToTodo = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id = $todoId CREATE (u)-[r:CREATED]->(t) RETURN type(r)";
 const createUserToTag = "MATCH (u:User), (t:Tag) WHERE u.id = $userId AND t.id = $tagId CREATE (u)-[r:CREATED]->(t) RETURN type(r)";
@@ -70,7 +72,32 @@ const createTodoToUser = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id
 
         todoJson.moment = todoJson.moment.toISOString();
 
-        await session.run(createTodo, {id: neo4j.int(todoJson.id), name: todoJson.name, description: todoJson.description, moment: todoJson.moment, checked: todoJson.checked, priority: neo4j.int(todoJson.priority)});
+        // check for meeting and possibly add properties
+        const sequelizeMeeting = await Meeting.findByPk(todoJson.id);
+        if (sequelizeMeeting) {
+          const meetingJson = sequelizeMeeting.toJSON();
+          await session.run(createMeeting, {
+            id: neo4j.int(todoJson.id),
+            name: todoJson.name,
+            description: todoJson.description,
+            moment: todoJson.moment,
+            checked: todoJson.checked,
+            priority: neo4j.int(todoJson.priority),
+            venue: meetingJson.venue,
+            duration: neo4j.int(meetingJson.duration), 
+            user_limit: neo4j.int(meetingJson.user_limit),            
+          });
+        } else {
+          await session.run(createTodo, {
+            id: neo4j.int(todoJson.id),
+            name: todoJson.name,
+            description: todoJson.description,
+            moment: todoJson.moment,
+            checked: todoJson.checked,
+            priority: neo4j.int(todoJson.priority)
+          });
+        }
+        
         await session.run(createUserToTodo, {userId: userJson.id, todoId: todoJson.id});      
       }
 
@@ -102,8 +129,5 @@ const createTodoToUser = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id
   } finally {
     await session.close()
   }
-
-  // on application exit:
   await driver.close()
-
 })();

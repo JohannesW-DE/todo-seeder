@@ -7,7 +7,8 @@
     "mariadb": "ts-node-dev ./src/mariadb.ts",
     "mongodb": "ts-node-dev ./src/mongodb.ts",
     "neo4j": "ts-node-dev ./src/neo4j.ts",
-    "mariadb:benchmark": "ts-node-dev ./src/benchmarks/mariadb.ts"
+    "mariadb:benchmark": "ts-node-dev ./src/benchmarks/mariadb.ts",
+    "playground": "ts-node-dev ./src/playground/index.ts"
   },
   "keywords": [],
   "author": "",
