@@ -4,7 +4,8 @@
 1. Daten in .env anpassen
 2. Seeden der MariaDB: ```npm run mariadb```
 3. Auf dem Seeding basierend ggf. die anderen Datenbanken befüllen
-  - ```npm run mongodb``` (ggf. die DB und die user-Collection manuell anlegen)
+  - ```npm run mongodb```: ggf. die 'todo' Collection vorher manuell anlegen)
+  - ```npm run mongodb:wo```: die besprochene Variante bei der Todos als eigenes Dokument hinterlegt werden (wo = without = User-Dokumente ohne eingebettete Todos)
   - ```npm run neo4j```
 4. Benchmarken (bisher nur mal ganz rudimentär nur für MariaDB und nur mit einem (immerhin rekursiven!) Query eingebaut)
   - ```npm run mariadb:benchmark```

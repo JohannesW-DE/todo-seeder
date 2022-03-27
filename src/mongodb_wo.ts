@@ -16,7 +16,8 @@ connect(process.env.MONGODB_URI!);
 
 (async () => {
 
-  await MongooseUser.deleteMany( {} );
+  await MongooseUserWO.deleteMany( {} );
+  await MongooseTodoWO.deleteMany( {} );
   
   const sequelizeUsers = await User.findAll( {} );
   const userIds: Record<number, Types.ObjectId> = {}
@@ -25,7 +26,7 @@ connect(process.env.MONGODB_URI!);
     const userJson = sequelizeUser.toJSON();
 
     // Create User
-    const mongooseUser = new MongooseUser({
+    const mongooseUser = new MongooseUserWO({
       username: userJson.username,
       name: userJson.name,
       email: userJson.email,
@@ -89,9 +90,12 @@ connect(process.env.MONGODB_URI!);
       const users = sequelizeTodoUsers.map((e) => userIds[e.toJSON().user_id]);
       todoJson.users = users
 
-      mongooseUser.todos.push(todoJson);
+      const todo = await MongooseTodoWO.create(todoJson)
+      const result = await todo.save();
 
-      todoIds[todoJson.id] = mongooseUser.todos[mongooseUser.todos.length - 1]._id;
+      mongooseUser.todos.push(todo);
+
+      todoIds[todoJson.id] = result._id;
     }
 
     await mongooseUser.save();

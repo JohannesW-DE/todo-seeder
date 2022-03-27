@@ -6,6 +6,7 @@
   "scripts": {
     "mariadb": "ts-node-dev ./src/mariadb.ts",
     "mongodb": "ts-node-dev ./src/mongodb.ts",
+    "mongodb:wo": "ts-node-dev ./src/mongodb_wo.ts",    
     "neo4j": "ts-node-dev ./src/neo4j.ts",
     "mariadb:benchmark": "ts-node-dev ./src/benchmarks/mariadb.ts",
     "playground": "ts-node-dev ./src/playground/index.ts"
