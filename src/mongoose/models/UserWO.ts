@@ -9,7 +9,6 @@ export interface MongoUserWO {
   name: string;
   email: string;
   tags: MongoTag[];
-  todos: MongoTodo[];
   friends: MongoUser[];
 }
 
@@ -19,7 +18,6 @@ const userSchemaWO = new Schema<MongoUserWO>(
     name: String,
     email: String,
     tags: [tagSchema],
-    todos: [{ type: Schema.Types.ObjectId, ref: "Todo" }],
     friends: [{ type: Schema.Types.ObjectId, ref: "UserWO" }]
   }
 );

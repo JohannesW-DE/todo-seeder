@@ -90,10 +90,13 @@ connect(process.env.MONGODB_URI!);
       const users = sequelizeTodoUsers.map((e) => userIds[e.toJSON().user_id]);
       todoJson.users = users
 
+      // Add User reference
+      todoJson.user = mongooseUser;      
+
       const todo = await MongooseTodoWO.create(todoJson)
       const result = await todo.save();
 
-      mongooseUser.todos.push(todo);
+      //mongooseUser.todos.push(todo);
 
       todoIds[todoJson.id] = result._id;
     }

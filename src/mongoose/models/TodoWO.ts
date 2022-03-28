@@ -13,6 +13,7 @@ export interface MongoTodo {
   parent: Types.ObjectId;
   tags: Types.ObjectId[];
   users: Types.ObjectId[];
+  user: Types.ObjectId;
 }
 
 const todoSchema = new Schema<MongoTodo>(
@@ -27,7 +28,8 @@ const todoSchema = new Schema<MongoTodo>(
     user_limit: Number,
     parent: { type: Schema.Types.ObjectId, ref: 'TodoWO' },
     tags: [Schema.Types.ObjectId],
-    users: [Schema.Types.ObjectId]    
+    users: [Schema.Types.ObjectId],
+    user: { type: Schema.Types.ObjectId, ref: 'UserWO' },  
   }
 );
 
