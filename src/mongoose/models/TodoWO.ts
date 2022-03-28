@@ -6,6 +6,7 @@ export interface MongoTodo {
   description: string;
   moment: Date;
   priority: number;
+  checked: number;
   venue: string;
   duration: number;
   user_limit: number;
@@ -20,6 +21,7 @@ const todoSchema = new Schema<MongoTodo>(
     description: String,
     moment: Date,
     priority: Number,
+    checked: Number,
     venue: String,
     duration: Number,
     user_limit: Number,
