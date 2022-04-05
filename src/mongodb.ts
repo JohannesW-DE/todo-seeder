@@ -40,7 +40,7 @@ connect(process.env.MONGODB_URI!);
     for (const sequelizeFriend of sequelizeFriends) {
       const friendJson = sequelizeFriend.toJSON();
 
-      const friend = await MongooseUser.findOne({'id': friendJson.id})
+      const friend = await MongooseUser.findOne({'_id': userIds[friendJson.user_friend_id]})
       if (friend) {
         mongooseUser.friends.push(friend)
       }  

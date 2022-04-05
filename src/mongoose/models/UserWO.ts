@@ -9,7 +9,7 @@ export interface MongoUserWO {
   name: string;
   email: string;
   tags: MongoTag[];
-  friends: MongoUser[];
+  friends: MongoUserWO[];
 }
 
 const userSchemaWO = new Schema<MongoUserWO>(

@@ -122,7 +122,7 @@ async function iterateTodoObject(todo: ITodoWithChildren, parentId: number | nul
       email: userObject.email,
     });
 
-    const currentUserId = user.toJSON().id
+    const currentUserId = user.toJSON().id;
 
     // Create Friends
     const dbUsers = await User.findAll( { where: { id: { [Op.not]: currentUserId } } } )
