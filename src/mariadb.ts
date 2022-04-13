@@ -10,11 +10,9 @@ import { UserUser } from './sequelize/models/UserUser';
 import { getRandomInteger, ITag, ITodo, percent, randomMeeting, randomTag, randomTodo, randomUsers } from './generator';
 import { Meeting } from './sequelize/models/Meeting';
 
-// parameters
-
+/* 
+// 1
 const USER_COUNT = 5;
-
-// chance in percent to "do something"
 const PROBABILITIES_TAGS_CREATION = [90, 70, 10, 1];
 const PROBABILITIES_TAGS_ADD = [40, 10, 1];
 const PROBABILITIES_TODO_CHILDREN = [80, 80, 80, 80, 20, 20]; // add child
@@ -23,6 +21,18 @@ const PROBABILITIES_FRIENDS = [100, 50];
 const PROBABILITIES_TODO_ADD_USER = [20, 10];
 const PROBABILITIES_MEETING_ADD_USER = [100, 90, 80, 70, 30];
 const PROBABILITY_TODO_IS_A_MEETING = 15; // TODO: lower
+*/
+// 2
+const USER_COUNT = 500;
+const PROBABILITIES_TAGS_CREATION = [90, 70, 10, 1];
+const PROBABILITIES_TAGS_ADD = [40, 10, 1];
+const PROBABILITIES_TODO_CHILDREN = [80, 80, 80, 80, 20, 20]; 
+const PROBABILITIES_TODO_DEPTH = [5, 25, 50, 75, 100];
+const PROBABILITIES_FRIENDS = [100, 50];
+const PROBABILITIES_TODO_ADD_USER = [20, 10];
+const PROBABILITIES_MEETING_ADD_USER = [100, 90, 80, 70, 30];
+const PROBABILITY_TODO_IS_A_MEETING = 15;
+
 
 //// sequelize associations
 
@@ -164,8 +174,6 @@ async function iterateTodoObject(todo: ITodoWithChildren, parentId: number | nul
     const dbTags = await Tag.findAll( { where: { user_id: currentUserId } } );
     const dbTagIds: number[] = dbTags.map((e) => e.toJSON().id);
 
-    console.log("root", root);
-
     if (dbTags.length > 0) {
       for (const todo of dbTodos) {
         let tagIds = dbTagIds;
@@ -176,10 +184,8 @@ async function iterateTodoObject(todo: ITodoWithChildren, parentId: number | nul
           replacements: { id: todo.toJSON().id },
           type: QueryTypes.SELECT
         });
-        console.log("meeting check", results.meeting_ascendants);
 
         if (results.meeting_ascendants === 0 && percent({percentage: PROBABILITY_TODO_IS_A_MEETING})) {
-          console.log("make meeting", results.meeting_ascendants);
           const meeting = randomMeeting();
           await Meeting.create( { todo_id: todo.toJSON().id, venue: meeting.venue, duration: meeting.duration, user_limit: meeting.user_limit } )
         }
