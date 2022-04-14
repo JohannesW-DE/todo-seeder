@@ -15,7 +15,7 @@ const driver = neo4j.driver(
 connect(process.env.MONGODB_URI!); // !!!
 
 /*
-#2 Was sind alle ? getaggten ToDos der nächsten 3 Tage?
+ * #2: Was sind alle ? getaggten ToDos der nächsten 3 Tage?
 */
 b.suite(
   'Testcase #2',

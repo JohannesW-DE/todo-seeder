@@ -15,7 +15,7 @@ const driver = neo4j.driver(
 connect(process.env.MONGODB_URI!); // !!!
 
 /*
-#1: Wieviel % einer ToDo (samt ToDos unterhalb) sind bereits erledigt?
+ * #1: Wieviel % einer ToDo (samt ToDos unterhalb) sind bereits erledigt?
 */
 b.suite(
   'Testcase #1',
@@ -35,7 +35,7 @@ b.suite(
 
     try {  
       const result = await session.run(queryOne);
-      console.log(result.records[0].toObject()['checked_percentage']);
+      console.log(result.records[0].get('checked_percentage'));
     } finally {
       await session.close()
     }
