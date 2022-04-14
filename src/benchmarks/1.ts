@@ -16,7 +16,7 @@ connect(process.env.MONGODB_URI!); // !!!
 
 /*
  * #1: Wieviel % einer ToDo (samt ToDos unterhalb) sind bereits erledigt?
-*/
+ */
 b.suite(
   'Testcase #1',
 
