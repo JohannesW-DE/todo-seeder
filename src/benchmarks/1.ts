@@ -23,12 +23,12 @@ b.suite(
   b.add('Neo4j', async () => {
     // #1: 10, #2: 16422
     const queryOne = `
-      MATCH (parent:Todo {id: 16422})-[:HAS_CHILD*]->(child)
-      WHERE child.checked = true
-      WITH COUNT(child) as children_checked
-      MATCH (parent:Todo {id: 16422})-[:HAS_CHILD*]->(child)
-      WITH count(child) as children_total, children_checked
-      RETURN (children_checked * 1.0 / children_total) * 100 AS checked_percentage
+      MATCH p = (parent:Todo {id: 16422})-[:HAS_CHILD*]->(child)
+      WITH TOFLOAT(COUNT(*))/100 AS divisor, COLLECT(child) AS children
+      UNWIND children AS c
+      WITH divisor, c
+      WHERE c.checked = true
+      RETURN COUNT(*)/divisor AS checked_percentage
     `;    
     
     const session = driver.session();
@@ -58,11 +58,11 @@ b.suite(
   }),
 
   b.add('MongoDB', async () => {
-    // #1: 62419d5fb4569bcaccb227b5, #2: 6256812b3dcaf6b5e88b466e
+    // #1: 62419d5fb4569bcaccb227b5, #2: 6257c8bc483363da23f9d3d2
     const pipeline = [
       {
         '$match': {
-          '_id': new Types.ObjectId('6256812b3dcaf6b5e88b466e'),
+          '_id': new Types.ObjectId('6257c8bc483363da23f9d3d2'),
         }
       }, {
         '$graphLookup': {
@@ -117,7 +117,7 @@ b.suite(
 
   b.complete(),
   
-  b.save({ file: 'reduce', version: '1.0.0' }),
+  b.save({ file: 'reduce', folder: 'benchmark_1', version: '1.0.0' }),
 
-  b.save({ file: 'reduce', format: 'chart.html' }),
+  b.save({ file: 'reduce', folder: 'benchmark_1', format: 'chart.html' }),
 );

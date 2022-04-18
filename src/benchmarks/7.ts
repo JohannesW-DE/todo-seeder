@@ -17,13 +17,13 @@ connect(process.env.MONGODB_URI!); // !!!
 
 /*
  * #7: Welche Freunde hat mein Freund die ich nicht als Freund habe?
-*/
+ */
 b.suite(
   'Testcase #7',
 
   b.add('Neo4j', async () => {
     // (Vorsicht: Dynamische drei Tage) <- bei GoogleDoc Version
-    // #1: 4 -> 5, #2: 4 -> 5
+    // #1: 5 -> 4, #2: 5 -> 4
     const queryOne = `
       MATCH (friend:User {id: 4})-[:FRIENDS_WITH]->(commonFriend:User)
       WITH commonFriend

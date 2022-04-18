@@ -18,63 +18,27 @@ const driver = neo4j.driver(
 connect(process.env.MONGODB_URI!); // !!!
 
 (async () => {
-  const before = new Date();
-  for (let i = 0; i < 20; i++) {
+  const session = driver.session();
 
-    const pipeline = [
-      {
-        '$match': {
-          '_id': new Types.ObjectId('6256812b3dcaf6b5e88b466e'),
-        }
-      }, {
-        '$graphLookup': {
-          'from': 'wo_todo', 
-          'startWith': '$_id', 
-          'connectFromField': '_id', 
-          'connectToField': 'parent', 
-          'as': 'todos'
-        }
-      }, {
-        '$unwind': {
-          'path': '$todos'
-        }
-      }, {
-        '$group': {
-          '_id': null, 
-          'checked': {
-            '$sum': {
-              '$cond': {
-                'if': {
-                  '$eq': [
-                    '$todos.checked', 1
-                  ]
-                }, 
-                'then': 1, 
-                'else': 0
-              }
-            }
-          }, 
-          'count': {
-            '$sum': 1
-          }
-        }
-      }, {
-        '$project': {
-          'checked': 1, 
-          'count': 1, 
-          'checked_percentage': {
-            '$divide': [
-              '$checked', '$count'
-            ]
-          }
-        }
-      }
-    ];
+  console.time("dbsave");
 
-    const result = await MongooseTodoWO.aggregate(pipeline).exec();
-    console.log(result[0].checked_percentage);
+  for (let i = 0; i < 100; i++) {
+    const queryOne = `
+      MATCH p = (parent:Todo {id: 16422})-[:HAS_CHILD*]->(child)
+      WITH TOFLOAT(COUNT(*))/100 AS divisor, COLLECT(child) AS children
+      UNWIND children AS c
+      WITH divisor, c
+      WHERE c.checked = true
+      RETURN COUNT(*)/divisor AS checked_percentage
+    `;    
+    
+    const result = await session.run(queryOne);
+    console.log(result.records[0].get('checked_percentage'));
   }
-  const after = new Date();
 
-  console.log(`Duration: ${after.getMilliseconds() - before.getMilliseconds()}`)
+  console.timeEnd("dbsave");
+
+  await session.close()
 })();
+
+// 123 -> 6257c871483363da23f905a5
