@@ -8,6 +8,7 @@ export const Meeting = sequelize.define('Meeting', {
     type: DataTypes.INTEGER.UNSIGNED,
     primaryKey: true,
     allowNull: false,
+    onDelete: 'CASCADE',
     references: {
       model: Todo,
       key: 'id'
