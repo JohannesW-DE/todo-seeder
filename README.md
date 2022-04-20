@@ -7,8 +7,14 @@
   - ```npm run mongodb```: ggf. die 'todo' Collection vorher manuell anlegen)
   - ```npm run mongodb:wo```: die besprochene Variante bei der Todos als eigenes Dokument hinterlegt werden (wo = without = User-Dokumente ohne eingebettete Todos)
   - ```npm run neo4j```
-4. Benchmarken (bisher nur mal ganz rudimentär)
+4. Benchmarken
   - ```npm run benchmark:1```
+  - ```npm run benchmark:2```
+  - ```npm run benchmark:7```
+  - ```npm run benchmark:8```
+  - ```npm run benchmark:add```
+  - ```npm run benchmark:update```
+  - ```npm run benchmark:delete```            
 
 Viel Spass beim Rumprobieren!
 
