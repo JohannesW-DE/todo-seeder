@@ -20,6 +20,14 @@ const driver = neo4j.driver(
 
 connect(process.env.MONGODB_URI!); // !!!
 
+/**
+ * Die Idee: Für alle Benutzer die ersten $LIMIT ungecheckten Todos nehmen und auf gecheckt setzen.
+ * 
+ * Wenn es weniger als $LIMIT ungecheckte Todos gibt ist das Okay und es werden dem entsprechend weniger Todos "umgeschaltet".
+ * 
+ * Das Updaten der Todos startet beim zuletzt eingefügten Benutzer.
+ */
+
 console.log('Testcase: UPDATE');
 
 const LIMIT = 20;
@@ -28,7 +36,7 @@ const LIMIT = 20;
   const userIds = [...Array(+(process.env.DB!)).keys()].map((e) => e + 1).reverse(); // 1...Anzahl der Benutzer (5, 50, 500, 5000)
 
   /**
-   * MariDB
+   * MariaDB
    */
 
   // Vorbereitung: Kostruktion einer Map user.id -> todo.id[]

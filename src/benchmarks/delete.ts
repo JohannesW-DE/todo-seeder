@@ -17,6 +17,17 @@ const driver = neo4j.driver(
 
 connect(process.env.MONGODB_URI!); // !!!
 
+/**
+ * Die Idee: Die Datenbank jeweils komplett clearen, wobei jeder Benutzer einzeln gelöscht wird.
+ * 
+ * Dabei soll berücksichtigt werden dass keine Karteileichen übrig bleiben (z.B. ObjectIds von bereits gelöschten Benutzern in
+ * den users-Arrays von Todos der MongoDB).
+ * 
+ * Das Löschen der Benutzer startet beim zuletzt eingefügten.
+ */
+
+console.log("Testcase: DELETE")
+
 const ids = [...Array(+(process.env.DB!)).keys()].map((e) => e + 1).reverse(); // 1 ... Anzahl der Benutzer (5, 50, 500, 5000)
 
 (async () => {
