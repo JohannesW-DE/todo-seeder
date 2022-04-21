@@ -1,24 +1,21 @@
 import neo4j from 'neo4j-driver'
-
 import { QueryTypes } from 'sequelize';
-
 import { hrtime } from 'process';
-
 import sequelize from '../sequelize';
+import fs from 'fs';
 import { MongooseTodoWO } from '../mongoose/models/TodoWO';
 import { connect, Types } from "mongoose";
 import { MongooseUserWO } from '../mongoose/models/UserWO';
-import mongoose from 'mongoose';
-import { map } from 'benchmark';
+import { User } from '../sequelize/models/User';
+
 
 require('dotenv').config({ path: './.env' })
 
-const driver = neo4j.driver(
-  process.env.NEO4J_URI!,
-  neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!)
-);
+// Connections (vorbereiten)
+const driver = neo4j.driver(process.env.NEO4J_URI!, neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!));
+connect(process.env.MONGODB_URI!);
 
-connect(process.env.MONGODB_URI!); // !!!
+const NS_TO_MS = BigInt(1_000_000);
 
 /**
  * Die Idee: Für alle Benutzer die ersten $LIMIT ungecheckten Todos nehmen und auf gecheckt setzen.
@@ -28,44 +25,67 @@ connect(process.env.MONGODB_URI!); // !!!
  * Das Updaten der Todos startet beim zuletzt eingefügten Benutzer.
  */
 
-console.log('Testcase: UPDATE');
-
-const LIMIT = 20;
+const LIMIT = 1;
 
 (async () => {
-  const userIds = [...Array(+(process.env.DB!)).keys()].map((e) => e + 1).reverse(); // 1...Anzahl der Benutzer (5, 50, 500, 5000)
+  /**
+   * Vorbereitungen
+   */
+
+  const mariaUsers = await User.findAll();
+  const mariaUsersIds = mariaUsers.map((e) => e.getDataValue('id'));
+
+  const mariaMap = new Map<number, number[]>();
+
+  for (const userId of mariaUsersIds) {
+    console.log(userId);
+    const [results, metadata] = await sequelize.query(`SELECT * FROM \`todo\` WHERE \`user_id\` = ${userId} AND \`checked\` = 0 LIMIT ${LIMIT}`);
+    const mariaTodoIds = results.map((e) => JSON.parse(JSON.stringify(e)).id);
+    mariaMap.set(userId, mariaTodoIds)
+  }
+
+  console.log(mariaMap);
+
+  const mongoMap = new Map<Types.ObjectId, Types.ObjectId[]>();
+
+  const mongoUsers = await MongooseUserWO.aggregate([
+    {
+      '$project': {
+        '_id': 1
+      }
+    }
+  ]).exec();
+  const mongoUserIds = mongoUsers.map((e) => e._id).reverse();
+
+  for (const userId of mongoUserIds) {
+    const mongoTodos = await MongooseTodoWO.aggregate([
+      {
+        '$match': {
+          'user': userId,
+          'checked': 0
+        }
+      }, {
+        '$limit': LIMIT
+      }, {
+        '$project': {
+          '_id': 1
+        }
+      }
+    ]).exec();
+    const mongoTodoIds = mongoTodos.map((e) => e._id)
+    mongoMap.set(userId, mongoTodoIds)
+  }
 
   /**
    * MariaDB
    */
 
-  // Vorbereitung: Kostruktion einer Map user.id -> todo.id[]
-  const mariaMap = new Map<number, number[]>();
-
-  for (const userId of userIds) {
-    const result = await sequelize.query(
-      'SELECT * FROM \`todo\` WHERE \`user_id\` = :id AND \`checked\` = 0 LIMIT :limit',
-      {
-        replacements: { id: userId, limit: LIMIT },
-        type: QueryTypes.SELECT
-      }
-    );
-    const mariaTodoIds = result.map((e) => JSON.parse(JSON.stringify(e)).id);
-    mariaMap.set(userId, mariaTodoIds)
-  }
-
-  // Execution
-
-  console.log("MariaDB");
-
-  console.time("MariaDB");
   const mariaStart = hrtime.bigint();
-
 
   for (const [userId, todoIds] of mariaMap) {
     if (todoIds.length > 0) {
-      const result = await sequelize.query(
-        'UPDATE \`todo\` SET \`checked\` = 1 WHERE \`id\` IN (:ids)',
+      console.log(userId, todoIds);
+      const result = await sequelize.query('UPDATE \`todo\` SET \`checked\` = 1 WHERE \`id\` IN (:ids)',
         {
           replacements: { ids: todoIds },
           type: QueryTypes.UPDATE
@@ -73,22 +93,16 @@ const LIMIT = 20;
       );
     }
   }
-  console.timeEnd("MariaDB");
-  const mariaEnd = hrtime.bigint();
-  console.log(`MariaDB: ${(mariaEnd - mariaStart) / BigInt(1000)} microseconds`)
 
+  const mariaEnd = hrtime.bigint();
+  const mariaDiff = (mariaEnd - mariaStart) / NS_TO_MS;
+
+  console.log(`MariaDB: ${mariaDiff} ms`);  
 
   /**
    * Neo4j
    */
 
-  // Vorbereitung nicht nötig, mariaMap IDs sind ja identisch!
-
-  // Execution
-
-  console.log("Neo4j");
-
-  console.time("Neo4j");  
   const neoStart = hrtime.bigint();
 
   const session = driver.session();
@@ -105,60 +119,29 @@ const LIMIT = 20;
     }
   } finally {
     await session.close();
-
-    console.timeEnd("Neo4j");
-    const neoEnd = hrtime.bigint();
-    console.log(`Neo4j: ${(neoEnd - neoStart) / BigInt(1000)} microseconds`)      
   }
 
+  const neoEnd = hrtime.bigint();
+  const neoDiff = (neoEnd - neoStart) / NS_TO_MS;
+
+  console.log(`Neo4j: ${neoDiff} ms`);  
   
   /**
    * MongoDB
    */
 
-  // Vorbereitung: Kostruktion einer Map UserID -> TodoID[] für Mongos ObjectIds
-  const mongoMap = new Map<Types.ObjectId, Types.ObjectId[]>();
-
-  const mongoUsers = await MongooseUserWO.aggregate([
-    {
-      '$project': {
-        '_id': 1
-      }
-    }
-  ]).exec();
-  const mongoUserIds = mongoUsers.map((e) => e._id).reverse();
-
-  for (const mongoUserId of mongoUserIds) {
-    const mongoTodos = await MongooseTodoWO.aggregate([
-      {
-        '$match': {
-          'user': mongoUserId,
-          'checked': 0
-        }
-      }, {
-        '$limit': LIMIT
-      }, {
-        '$project': {
-          '_id': 1
-        }
-      }
-    ]).exec();
-    const mongoTodoIds = mongoTodos.map((e) => e._id)
-    mongoMap.set(mongoUserId, mongoTodoIds)
-  }
-
-  // Execution
-
-  console.log("MongoDB");
-
-  console.time("MongoDB");
   const mongoStart = hrtime.bigint();
 
   for (const [userId, todoIds] of mongoMap) {    
     const updateDocument = await MongooseTodoWO.updateMany({ _id: { $in: todoIds }}, { $set: { checked: 1 } });
   }
 
-  console.timeEnd("MongoDB");
   const mongoEnd = hrtime.bigint();
-  console.log(`MariaDB: ${(mongoEnd - mongoStart) / BigInt(1000)} microseconds`);
+  const mongoDiff = (mongoEnd - mongoStart) / NS_TO_MS;
+
+  console.log(`MongoDB: ${mongoDiff} ms`);  
+
+  const line = `mariadb=${mariaDiff}|neo4j=${neoDiff}|mongodb=${mongoDiff}|todos=${LIMIT}\r\n`;
+
+  fs.appendFileSync(`benchmark_results/update.log`, line);
 })();

@@ -1,21 +1,23 @@
 import neo4j from 'neo4j-driver'
 
 import { QueryTypes } from 'sequelize';
-
+import fs from 'fs';
 import sequelize from '../sequelize';
 import { MongooseTodoWO } from '../mongoose/models/TodoWO';
 import { connect, Types } from "mongoose";
 import { MongooseUserWO } from '../mongoose/models/UserWO';
 import mongoose from 'mongoose';
+import { User } from '../sequelize/models/User';
+import { hrtime } from 'process';
 
 require('dotenv').config({ path: './.env' })
 
-const driver = neo4j.driver(
-  process.env.NEO4J_URI!,
-  neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!)
-);
+// Connections (vorbereiten)
+const driver = neo4j.driver(process.env.NEO4J_URI!, neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!));
+connect(process.env.MONGODB_URI!);
 
-connect(process.env.MONGODB_URI!); // !!!
+const NS_TO_MS = BigInt(1_000_000);
+
 
 /**
  * Die Idee: Die Datenbank jeweils komplett clearen, wobei jeder Benutzer einzeln gelöscht wird.
@@ -26,51 +28,14 @@ connect(process.env.MONGODB_URI!); // !!!
  * Das Löschen der Benutzer startet beim zuletzt eingefügten.
  */
 
-console.log("Testcase: DELETE")
-
-const ids = [...Array(+(process.env.DB!)).keys()].map((e) => e + 1).reverse(); // 1 ... Anzahl der Benutzer (5, 50, 500, 5000)
 
 (async () => {
-  // MariaDB
-  console.log("MariaDB");
+  /**
+   * Vorbereitungen
+   */
 
-  console.time("MariaDB");
-
-  for (const id of ids) {  
-    const result = await sequelize.query(
-      `DELETE FROM \`user\` WHERE id = :id`,
-      {
-        replacements: { id },
-        type: QueryTypes.DELETE
-      }
-    );
-  }
-
-  console.timeEnd("MariaDB");
-
-  // Neo4J
-  console.log("Neo4j");
-
-  console.time("Neo4j");
-
-  const session = driver.session();
-
-  try {  
-    for (const id of ids) {  
-      const query = `
-        MATCH (user: User {id: $id})-[r:CREATED]->(entry)
-        DETACH DELETE user, entry
-      `;   
-
-      const result = await session.run(query, { id });
-    }
-  } finally {
-    await session.close();
-    console.timeEnd("Neo4j");
-  }
-
-  // MongoDB
-  console.log("MongoDB");
+  const mariaUsers = await User.findAll();
+  const mariaUsersIds = mariaUsers.map((e) => e.getDataValue('id')).reverse();
 
   const pipeline = [
     {
@@ -82,7 +47,50 @@ const ids = [...Array(+(process.env.DB!)).keys()].map((e) => e + 1).reverse(); /
   const result = await MongooseUserWO.aggregate(pipeline).exec();
   const userIds = result.map((e) => e._id).reverse();
 
-  console.time("MongoDB");
+  /**
+   * MariaDB
+   */
+
+  const mariaStart = hrtime.bigint();
+
+  for (const id of mariaUsersIds) {  
+    const result = await sequelize.query(`DELETE FROM \`user\` WHERE id = ${id}`);
+  }
+
+  const mariaEnd = hrtime.bigint();
+  const mariaDiff = (mariaEnd - mariaStart) / NS_TO_MS;
+
+  console.log(`MariaDB: ${mariaDiff} ms`);  
+
+  /**
+   * Neo4j
+   */
+  const neoStart = hrtime.bigint();
+
+  const session = driver.session();
+
+  try {  
+    for (const id of mariaUsersIds) {  
+      const query = `
+        MATCH (user: User {id: $id})-[r:CREATED]->(entry)
+        DETACH DELETE user, entry
+      `;   
+      const result = await session.run(query, { id });
+    }
+  } finally {
+    await session.close();
+  }
+
+  const neoEnd = hrtime.bigint();
+  const neoDiff = (neoEnd - neoStart) / NS_TO_MS;
+
+  console.log(`Neo4j: ${neoDiff} ms`);  
+
+  /**
+   * MongoDB
+   */
+
+  const mongoStart = hrtime.bigint();
 
   for (const userId of userIds) {  
     const removeUsersDocument = await MongooseTodoWO.updateMany({}, { $pull: { users: userId } });
@@ -90,5 +98,12 @@ const ids = [...Array(+(process.env.DB!)).keys()].map((e) => e + 1).reverse(); /
     const removeUserDocument = await MongooseUserWO.deleteOne({ _id: userId });
   }
 
-  console.timeEnd("MongoDB"); 
+  const mongoEnd = hrtime.bigint();
+  const mongoDiff = (mongoEnd - mongoStart) / NS_TO_MS;
+
+  console.log(`MongoDB: ${mongoDiff} ms`);  
+
+  const line = `mariadb=${mariaDiff}|neo4j=${neoDiff}|mongodb=${mongoDiff}|users=${mariaUsersIds.length}\r\n`;
+
+  fs.appendFileSync(`benchmark_results/delete.log`, line);
 })();

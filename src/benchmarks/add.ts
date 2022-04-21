@@ -1,4 +1,5 @@
 import { hrtime } from 'process';
+import fs from 'fs';
 import { getRandomInteger, ITag, ITodo, percent, randomMeeting, randomTag, randomTodo, randomUsers } from '../generator'
 import { MongooseUserWO } from '../mongoose/models/UserWO';
 import sequelize from '../sequelize';
@@ -8,16 +9,12 @@ import { connect, Types } from "mongoose";
 import { MongooseTodoWO } from '../mongoose/models/TodoWO';
 import neo4j, { Session } from 'neo4j-driver'
 
+
+// Connections (vorbereiten)
+const driver = neo4j.driver(process.env.NEO4J_URI!, neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!));
 connect(process.env.MONGODB_URI!);
 
-const driver = neo4j.driver(
-  process.env.NEO4J_URI!,
-  neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!)
-);
-
-const createTodo = "CREATE (todo:Todo {id: $id, name: $name, description: $description, moment: datetime($moment), priority: $priority, checked: $checked}) RETURN todo";
-const createUserToTodo = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id = $todoId CREATE (u)-[r:CREATED]->(t) RETURN *";
-const createTodoToTodo = "MATCH (parent:Todo), (child:Todo) WHERE parent.id = $parentId AND child.id = $childId CREATE (parent)-[r:HAS_CHILD]->(child) RETURN *";
+const NS_TO_MS = BigInt(1_000_000);
 
 /**
  * Die Idee: Eine Todo-Hierarchie generieren und dem zuletzt hinzugefügten Benutzer anhängen.
@@ -31,8 +28,6 @@ const createTodoToTodo = "MATCH (parent:Todo), (child:Todo) WHERE parent.id = $p
  * die IDs der MariaDB geklaut werden können/sollen/werden.
  */
 
- console.log("Testcase: ADD")
-
 /**
  * Todos
  */
@@ -45,7 +40,11 @@ interface ITodoWithChildren extends ITodo {
   random_id: number; // nötig für den Neo4j-Insert
 }
 
+let counter = 0;
+
 function createTodos(todo: ITodoWithChildren, depth: number): ITodoWithChildren {
+  counter += 1;
+
   if (percent( { percentage: PROBABILITIES_TODO_DEPTH[depth] } )) { // no children
     return todo;
   }
@@ -68,6 +67,11 @@ console.log("Todos", root);
 /**
  * Recursives
  */
+
+const createTodo = "CREATE (todo:Todo {id: $id, name: $name, description: $description, moment: datetime($moment), priority: $priority, checked: $checked}) RETURN todo";
+const createUserToTodo = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id = $todoId CREATE (u)-[r:CREATED]->(t) RETURN *";
+const createTodoToTodo = "MATCH (parent:Todo), (child:Todo) WHERE parent.id = $parentId AND child.id = $childId CREATE (parent)-[r:HAS_CHILD]->(child) RETURN *";
+ 
 
 async function createMariaTodos(todo: ITodoWithChildren, parentId: number | null, userId: number) {
   const obj = {
@@ -120,75 +124,66 @@ async function createNeoTodos(todo: ITodoWithChildren, parentId: number | null, 
 
 (async () => {
   /**
+   * Vorbereitungen
+   */
+
+   const mariaUser = await User.findOne( { order: sequelize.literal('id DESC') } ); // Neusten Benutzer finden
+   if (!mariaUser) {
+     return;
+   }
+
+   const mongoUser = await MongooseUserWO.findOne({}).sort( { $natural: -1 } )
+   if (!mongoUser) {
+     return;
+   }
+
+  /**
    * MariaDB
    */
 
-  // Vorbereitung: Letzten Benutzer finden
-  const mariaUser = await User.findOne( { order: sequelize.literal('id DESC') } )
-  console.log("MariaDB - user", mariaUser);
-  if (!mariaUser) {
-    return;
-  }
-
-  // Execution
-
-  console.log("MariaDB");
-
-  console.time("MariaDB");
   const mariaStart = hrtime.bigint();
 
   await createMariaTodos(root, null, mariaUser.toJSON().id);
 
-  console.timeEnd("MariaDB");
   const mariaEnd = hrtime.bigint();
-  console.log(`MariaDB: ${(mariaEnd - mariaStart) / BigInt(1000)} microseconds`)
+  const mariaDiff = (mariaEnd - mariaStart) / NS_TO_MS;
+
+  console.log(`MariaDB: ${mariaDiff} ms`);  
+
 
   /**
    * Neo4j
    */
 
-  // Vorbereitung: Keine, User bekannt via MariaDB
-
-  // Execution
-
-  console.log("Neo4j");
-
-  console.time("Neo4j");
   const neoStart = hrtime.bigint();
 
   const session = driver.session();
   try {  
     await createNeoTodos(root, null, mariaUser.toJSON().id, session);
   } finally {
-    await session.close();
-
-    console.timeEnd("Neo4j");
-    const neoEnd = hrtime.bigint();
-    console.log(`Neo4j: ${(neoEnd - neoStart) / BigInt(1000)} microseconds`)      
+    await session.close(); 
   }
+  
+  const neoEnd = hrtime.bigint();
+  const neoDiff = (neoEnd - neoStart) / NS_TO_MS;
+
+  console.log(`Neo4j: ${neoDiff} ms`);    
 
   /**
    * MongoDB
    */
 
-  // Vorbereitung: Letzten Benutzer finden
-  const mongoUser = await MongooseUserWO.findOne({}).sort( { $natural: -1 } )
-
-  if (!mongoUser) {
-    return;
-  }
-
-  // Execution
-
-  console.log("MongoDB");
-
-  console.time("MongoDB");
   const mongoStart = hrtime.bigint();
 
   await createMongoTodos(root, null, mongoUser._id);
 
-  console.timeEnd("MongoDB");
   const mongoEnd = hrtime.bigint();
-  console.log(`MongoDB: ${(mongoEnd - mongoStart) / BigInt(1000)} microseconds`)
+  const mongoDiff = (mongoEnd - mongoStart) / NS_TO_MS;
+
+  console.log(`MongoDB: ${mongoDiff} ms`);  
+
+  const line = `mariadb=${mariaDiff}|neo4j=${neoDiff}|mongodb=${mongoDiff}|todos=${counter}\r\n`;
+
+  fs.appendFileSync(`benchmark_results/add.log`, line);
 
 })();

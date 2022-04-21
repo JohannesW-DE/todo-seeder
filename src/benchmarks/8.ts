@@ -1,33 +1,88 @@
-import neo4j from 'neo4j-driver'
+import { hrtime } from 'process';
+import fs from 'fs';
+import assert from 'assert';
 
-import b from 'benny';
-import sequelize from '../sequelize';
+import neo4j, { ResultSummary } from 'neo4j-driver'
+
 import { MongooseTodoWO } from '../mongoose/models/TodoWO';
 import { connect, Types } from "mongoose";
+
+import sequelize from '../sequelize';
+import { User } from '../sequelize/models/User';
+import { Tag } from '../sequelize/models/Tag';
 import { MongooseUserWO } from '../mongoose/models/UserWO';
+import { UserUser } from '../sequelize/models/UserUser';
+
 
 require('dotenv').config({ path: './.env' })
 
-const driver = neo4j.driver(
-  process.env.NEO4J_URI!,
-  neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!)
-);
+const NS_TO_MS = BigInt(1_000_000);
 
-connect(process.env.MONGODB_URI!); // !!!
+// Connections (vorbereiten)
+const driver = neo4j.driver(process.env.NEO4J_URI!, neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!));
+connect(process.env.MONGODB_URI!);
 
-/*
- * #8: Mit welchem Benutzer wurde ich am häufigsten zu einer Todo hinzugefügt? (ABGEÄNDERT!)
+/**
+ * Testfall: Mit welchem Benutzer wurde ich am häufigsten zu einer Todo hinzugefügt?
+ * 
+ * Hier wird nicht der Sonderfall gehandhabt dass es mehrere Benutzer geben kann, es wird einfach der Erstbeste genommen.
  */
-b.suite(
-  'Testcase #8',
 
-  b.add('Neo4j', async () => {
-    // #1: ?, #2: 5
-    const queryOne = `
-      MATCH (user:User {id: 5})-[:ASSIGNED_TO]->(todo:Todo)
+(async () => {
+
+  /**
+   * Vorbereitungen
+   */
+
+  const mariaUsers = await User.findAll();
+  const mariaUsersIds = mariaUsers.map((e) => e.getDataValue('id'));
+
+  const mongoUsers = await MongooseUserWO.find();
+  const mongoUserIds = mongoUsers.map((e) => e._id);
+
+  assert(mariaUsersIds.length === mongoUserIds.length);
+
+  /**
+   * MariaDB
+   */
+
+  const mariaStart = hrtime.bigint();
+
+  for (const id of mariaUsersIds) { 
+    const query = `
+      SELECT *, COUNT(*) as \`count\` 
+      FROM \`todo_user\` 
+      JOIN user ON user.id = user_id
+      WHERE \`todo_id\` IN (
+        SELECT \`todo_id\` FROM \`todo_user\` WHERE user_id = ${id}
+      )
+      AND user_id != ${id}
+      GROUP BY user_id
+      ORDER BY \`count\`
+      DESC LIMIT 1
+    `;
+  
+    const [results, metadata] = await sequelize.query(query);
+    //console.log("MariaDB", results[0]);
+  }
+
+  const mariaEnd = hrtime.bigint();
+  const mariaDiff = (mariaEnd - mariaStart) / NS_TO_MS;
+
+  console.log(`MariaDB: ${mariaDiff} ms`);  
+
+  /**
+   * Neo4j
+   */
+
+  const neoStart = hrtime.bigint();
+
+  for (const id of mariaUsersIds) {  
+    const query = `
+      MATCH (user:User {id: ${id}})-[:ASSIGNED_TO]->(todo:Todo)
       WITH todo
       MATCH (otherUser: User)-[assignment:ASSIGNED_TO]->(todo)
-      WHERE otherUser.id <> 5
+      WHERE otherUser.id <> ${id}
       RETURN otherUser, count(otherUser) AS count
       ORDER BY count DESC
       LIMIT 1
@@ -36,37 +91,31 @@ b.suite(
     const session = driver.session();
 
     try {  
-      const result = await session.run(queryOne);
-      console.log("Neo4j: ", result.records[0].get('count')['low'], result.records[0].get('otherUser'));
+      const result = await session.run(query);
+      //if (result.records.length > 0) {
+      //  console.log("Neo4j", result.records[0].get('otherUser'), result.records[0].get('count'));
+      //}
     } finally {
       await session.close()
     }
-  }),
+  }
 
-  b.add('MariaDB', async () => {
-    const queryOne = `
-      SELECT *, COUNT(*) as \`count\` 
-      FROM \`todo_user\` 
-      JOIN user ON user.id = user_id
-      WHERE \`todo_id\` IN (
-        SELECT \`todo_id\` FROM \`todo_user\` WHERE user_id = 5
-      )
-      AND user_id != 5
-      GROUP BY user_id
-      ORDER BY \`count\`
-      DESC LIMIT 1
-    `;
-  
-    const [results, metadata] = await sequelize.query(queryOne);
-    console.log("MariaDB", results);
-  }),
+  const neoEnd = hrtime.bigint();
+  const neoDiff = (neoEnd - neoStart) / NS_TO_MS;
 
-  b.add('MongoDB', async () => {
-    // #1: ? , #2: 6257c871483363da23f9063c
+  console.log(`Neo4j: ${neoDiff} ms`);  
+
+  /**
+   * MongoDB
+   */
+
+  const mongoStart = hrtime.bigint();
+
+  for (const id of mongoUserIds) {
     const pipeline = [
       {
         '$match': {
-          'users': new Types.ObjectId('6257c871483363da23f9063c')
+          'users': id
         }
       }, {
         '$unwind': {
@@ -75,7 +124,7 @@ b.suite(
       }, {
         '$match': {
           'users': {
-            '$ne': new Types.ObjectId('6257c871483363da23f9063c')
+            '$ne': id
           }
         }
       }, {
@@ -102,26 +151,17 @@ b.suite(
           }
         }
       } 
-    ]
-
-    // Sortieren in der Pipeline geht nicht?!
-    /*
-    {
-      '$sort': {
-        'count': -1
-      }
-    },
-    */
-
+    ];
     const result = await MongooseTodoWO.aggregate(pipeline).exec();
-    console.log("MongoDB: ", result);
-  }),
+    //console.log("MongoDB: ", result);
+  }
 
-  b.cycle(),
+  const mongoEnd = hrtime.bigint();
+  const mongoDiff = (mongoEnd - mongoStart) / NS_TO_MS;
 
-  b.complete(),
-  
-  b.save({ file: 'reduce', version: '1.0.0' }),
+  console.log(`MongoDB: ${mongoDiff} ms`);  
 
-  b.save({ file: 'reduce', format: 'chart.html' }),
-);
+  const line = `mariadb=${mariaDiff}|neo4j=${neoDiff}|mongodb=${mongoDiff}|queries=${mariaUsers.length}\r\n`;
+
+  fs.appendFileSync(`benchmark_results/${mariaUsers.length}_8.log`, line);
+})();

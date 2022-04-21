@@ -1,5 +1,5 @@
 {
-  "name": "todo_faker",
+  "name": "todo-seeder",
   "version": "1.0.0",
   "description": "",
   "main": "index.ts",
@@ -12,13 +12,13 @@
     "benchmark:2": "ts-node-dev ./src/benchmarks/2.ts",
     "benchmark:7": "ts-node-dev ./src/benchmarks/7.ts",
     "benchmark:8": "ts-node-dev ./src/benchmarks/8.ts",
+    "benchmark:8b": "ts-node-dev ./src/benchmarks/8b.ts",
     "benchmark:delete": "ts-node-dev ./src/benchmarks/delete.ts",
     "benchmark:update": "ts-node-dev ./src/benchmarks/update.ts",
-    "benchmark:add": "ts-node-dev ./src/benchmarks/add.ts",
-    "playground": "ts-node-dev ./src/playground/index.ts"
+    "benchmark:add": "ts-node-dev ./src/benchmarks/add.ts"
   },
   "keywords": [],
-  "author": "",
+  "author": "Johannes Weinsheimer",
   "license": "ISC",
   "dependencies": {
     "@ngneat/falso": "^4.0.0",
@@ -31,13 +31,10 @@
     "mysql2": "^2.3.3",
     "neo4j-driver": "^4.4.5",
     "sequelize": "^6.18.0",
-    "ts-node-dev": "^1.1.8",
-    "uuid": "^8.3.2"
+    "ts-node-dev": "^1.1.8"
   },
   "devDependencies": {
     "@faker-js/faker": "^6.1.2",
-    "@types/uuid": "^8.3.4",
-    "benny": "^3.7.1",
     "typescript": "^4.6.3"
   }
 }

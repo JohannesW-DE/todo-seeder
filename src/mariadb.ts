@@ -11,16 +11,17 @@ import { getRandomInteger, ITag, ITodo, percent, randomMeeting, randomTag, rando
 import { Meeting } from './sequelize/models/Meeting';
 
 
-// 1
+// 50
 const USER_COUNT = 5;
 const PROBABILITIES_TAGS_CREATION = [90, 70, 10, 1];
 const PROBABILITIES_TAGS_ADD = [40, 10, 1];
+const PROBABILITIES_TODO_CHILDREN_AT_ROOT = [80, 80, 80, 80, 80, 80, 80, 80, 80, 80];
 const PROBABILITIES_TODO_CHILDREN = [80, 80, 80, 80, 80, 20, 20]; // add child
 const PROBABILITIES_TODO_DEPTH = [5, 25, 50, 75, 100]; // end at a certain depth
-const PROBABILITIES_FRIENDS = [100, 50];
-const PROBABILITIES_TODO_ADD_USER = [20, 10];
+const PROBABILITIES_FRIENDS = [80, 80, 50, 20];
+const PROBABILITIES_TODO_ADD_USER = [5, 5, 1];
 const PROBABILITIES_MEETING_ADD_USER = [100, 90, 80, 70, 30];
-const PROBABILITY_TODO_IS_A_MEETING = 15; // TODO: lower
+const PROBABILITY_TODO_IS_A_MEETING = 10;
 
 // 2
 /*
@@ -83,7 +84,9 @@ function createTodos(todo: ITodoWithChildren, depth: number): ITodoWithChildren 
     return todo;
   }
 
-  for (const todoChildProbability of PROBABILITIES_TODO_CHILDREN) {
+  const probabilities = depth === 0 ? PROBABILITIES_TODO_CHILDREN_AT_ROOT: PROBABILITIES_TODO_CHILDREN;
+
+  for (const todoChildProbability of probabilities) {
     if (percent({percentage: todoChildProbability})) {
       const children = createTodos({...randomTodo(todo.moment), todos: [] }, depth + 1);
       todo.todos.push(children);

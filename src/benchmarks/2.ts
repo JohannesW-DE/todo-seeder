@@ -1,34 +1,98 @@
+import { hrtime } from 'process';
+import fs from 'fs';
+
 import neo4j from 'neo4j-driver'
 
-import b from 'benny';
-import sequelize from '../sequelize';
 import { MongooseTodoWO } from '../mongoose/models/TodoWO';
-import { connect, Types } from "mongoose";
+import { connect } from "mongoose";
+
+import sequelize from '../sequelize';
+import { User } from '../sequelize/models/User';
+import { Tag } from '../sequelize/models/Tag';
+import { MongooseUserWO } from '../mongoose/models/UserWO';
+
 
 require('dotenv').config({ path: './.env' })
 
-const driver = neo4j.driver(
-  process.env.NEO4J_URI!,
-  neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!)
-);
+const NS_TO_MS = BigInt(1_000_000);
 
-connect(process.env.MONGODB_URI!); // !!!
+// Connections (vorbereiten)
+const driver = neo4j.driver(process.env.NEO4J_URI!, neo4j.auth.basic(process.env.NEO4J_USER!, process.env.NEO4J_PASSWORD!));
+connect(process.env.MONGODB_URI!);
 
-/*
- * #2: Was sind alle ? getaggten ToDos der nächsten 3 Tage?
+/**
+ * Testfall: Finde alle mit ? getaggten Todos der nächsten 7 Tage!
+ * 
+ * Hier bietet es sich an jedes Tag anzuschauen.
  */
-b.suite(
-  'Testcase #2',
 
-  b.add('Neo4j', async () => {
-    // (Vorsicht: Dynamische drei Tage) <- bei GoogleDoc Version
-    // #1: 2 (2022-03-18 14:45:00, 2022-03-21 14:45:00), #2: 8 (2022-04-13 08:00:00, 2022-04-16 08:00:00)
-    const queryOne = `
+(async () => {
+
+  /**
+   * Vorbereitungen
+   */
+
+  const mariaUsers = await User.findAll(); // verwenden um die Datenbankgrösse on the fly zu bestimmen
+
+  const mariaTags = await Tag.findAll();
+  const mariaTagIds = mariaTags.map((e) => e.getDataValue('id'));
+
+  const tagsPipeline = [
+    {
+      '$unwind': {
+        'path': '$tags'
+      }
+    }, {
+      '$replaceRoot': {
+        'newRoot': '$tags'
+      }
+    }, {
+      '$group': {
+        '_id': 0, 
+        'ids': {
+          '$addToSet': '$_id'
+        }
+      }
+    }
+  ]
+  const mongoTags = await MongooseUserWO.aggregate(tagsPipeline).exec();
+  const mongoTagIds = mongoTags[0].ids;
+
+  /**
+   * MariaDB
+   */
+
+  const mariaStart = hrtime.bigint();
+
+  for (const id of mariaTagIds) {  
+    const query = `
+      SELECT * FROM \`todo\` 
+      INNER JOIN \`todo_tag\` ON \`todo_tag\`.\`todo_id\` = \`todo\`.\`id\`
+      WHERE \`todo_tag\`.\`tag_id\` = '${id}' AND \`moment\` BETWEEN '2022-04-20 08:00:00' AND '2022-04-27 08:00:00' 
+    `;
+  
+    const [results, metadata] = await sequelize.query(query);
+    console.log("MariaDB", results.length);
+  }
+
+  const mariaEnd = hrtime.bigint();
+  const mariaDiff = (mariaEnd - mariaStart) / NS_TO_MS;
+
+  console.log(`MariaDB: ${mariaDiff} ms`);  
+
+  /**
+   * Neo4j
+   */
+
+  const neoStart = hrtime.bigint();
+
+  for (const id of mariaTagIds) {  
+    const query = `
       MATCH (todo:Todo)
-      WHERE datetime("2022-04-13T08:00:00.000Z") <= todo.moment <= datetime("2022-04-16T08:00:00.000Z")
+      WHERE datetime("2022-04-20T08:00:00.000Z") <= todo.moment <= datetime("2022-04-27T08:00:00.000Z")
       AND EXISTS {
         MATCH (todo)-[:HAS_TAG]->(tag:Tag)
-        WHERE tag.id = 8
+        WHERE tag.id = ${id}
       }
       RETURN todo
     `;    
@@ -36,43 +100,43 @@ b.suite(
     const session = driver.session();
 
     try {  
-      const result = await session.run(queryOne);
-      console.log("Neo4j: ", result.records.length);
+      const result = await session.run(query);
+      console.log("Neo4j", result.records.length);
     } finally {
       await session.close()
     }
-  }),
+  }
 
-  b.add('MariaDB', async () => {
-    const queryOne = `
-      SELECT * FROM \`todo\` 
-      INNER JOIN \`todo_tag\` ON \`todo_tag\`.\`todo_id\` = \`todo\`.\`id\`
-      WHERE \`todo_tag\`.\`tag_id\` = '8' AND \`moment\` BETWEEN '2022-04-13 08:00:00' AND '2022-04-16 08:00:00' 
-    `;
-  
-    const [results, metadata] = await sequelize.query(queryOne);
-    console.log("MariaDB", results.length);
-  }),
+  const neoEnd = hrtime.bigint();
+  const neoDiff = (neoEnd - neoStart) / NS_TO_MS;
 
-  b.add('MongoDB', async () => {
-    // #1: 62419d5fb4569bcaccb227b5, #2: 6256812b3dcaf6b5e88b466e
+  console.log(`Neo4j: ${neoDiff} ms`);  
+
+  /**
+   * MongoDB
+   */
+
+  const mongoStart = hrtime.bigint();
+
+  for (const id of mongoTagIds) {
     const pipeline = [
       {
         '$match': {
-          tags: {$elemMatch: { $eq: new Types.ObjectId('625680e73dcaf6b5e88a78e6')} },
-          moment: {$gte: new Date("2022-04-13T08:00:00.000Z"), $lte: new Date("2022-04-16T08:00:00.000Z")}
+          tags: {$elemMatch: { $eq: id } },
+          moment: {$gte: new Date("2022-04-20T08:00:00.000Z"), $lte: new Date("2022-04-27T08:00:00.000Z")}
         }
       }
     ]
     const result = await MongooseTodoWO.aggregate(pipeline).exec();
     console.log("MongoDB: ", result.length);
-  }),
-  
-  b.cycle(),
+  }
 
-  b.complete(),
-  
-  b.save({ file: 'reduce', version: '1.0.0' }),
+  const mongoEnd = hrtime.bigint();
+  const mongoDiff = (mongoEnd - mongoStart) / NS_TO_MS;
 
-  b.save({ file: 'reduce', format: 'chart.html' }),
-);
+  console.log(`MongoDB: ${mongoDiff} ms`);  
+
+  const line = `mariadb=${mariaDiff}|neo4j=${neoDiff}|mongodb=${mongoDiff}|queries=${mariaTags.length}\r\n`;
+
+  fs.appendFileSync(`benchmark_results/${mariaUsers.length}_2.log`, line);
+})();
