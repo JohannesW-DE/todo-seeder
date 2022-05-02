@@ -191,5 +191,5 @@ connect(process.env.MONGODB_URI!);
 
   const line = `mariadb=${mariaDiff}|neo4j=${neoDiff}|mongodb=${mongoDiff}|queries=${mariaFriends.length}\r\n`;
 
-  fs.appendFileSync(`benchmark_results/${mariaUsers.length}_7.log`, line);
+  fs.appendFileSync(`benchmark_results/${mariaUsers.length}_3.log`, line);
 })();

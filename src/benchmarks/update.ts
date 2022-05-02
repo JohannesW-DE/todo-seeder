@@ -25,7 +25,7 @@ const NS_TO_MS = BigInt(1_000_000);
  * Das Updaten der Todos startet beim zuletzt eingefügten Benutzer.
  */
 
-const LIMIT = 1;
+const LIMIT = 10;
 
 (async () => {
   /**
@@ -43,8 +43,6 @@ const LIMIT = 1;
     const mariaTodoIds = results.map((e) => JSON.parse(JSON.stringify(e)).id);
     mariaMap.set(userId, mariaTodoIds)
   }
-
-  console.log(mariaMap);
 
   const mongoMap = new Map<Types.ObjectId, Types.ObjectId[]>();
 
@@ -84,7 +82,6 @@ const LIMIT = 1;
 
   for (const [userId, todoIds] of mariaMap) {
     if (todoIds.length > 0) {
-      console.log(userId, todoIds);
       const result = await sequelize.query('UPDATE \`todo\` SET \`checked\` = 1 WHERE \`id\` IN (:ids)',
         {
           replacements: { ids: todoIds },

@@ -72,7 +72,7 @@ connect(process.env.MONGODB_URI!);
     `;
   
     const [results, metadata] = await sequelize.query(query);
-    console.log("MariaDB", results.length);
+    //console.log("MariaDB", results.length);
   }
 
   const mariaEnd = hrtime.bigint();
@@ -88,12 +88,8 @@ connect(process.env.MONGODB_URI!);
 
   for (const id of mariaTagIds) {  
     const query = `
-      MATCH (todo:Todo)
+      MATCH (todo:Todo)-[r:HAS_TAG]->(tag:Tag {id: ${id}})
       WHERE datetime("2022-04-20T08:00:00.000Z") <= todo.moment <= datetime("2022-04-27T08:00:00.000Z")
-      AND EXISTS {
-        MATCH (todo)-[:HAS_TAG]->(tag:Tag)
-        WHERE tag.id = ${id}
-      }
       RETURN todo
     `;    
     
@@ -101,7 +97,7 @@ connect(process.env.MONGODB_URI!);
 
     try {  
       const result = await session.run(query);
-      console.log("Neo4j", result.records.length);
+      //console.log("Neo4j", result.records.length);
     } finally {
       await session.close()
     }
@@ -122,13 +118,13 @@ connect(process.env.MONGODB_URI!);
     const pipeline = [
       {
         '$match': {
-          tags: {$elemMatch: { $eq: id } },
+          tags: id,
           moment: {$gte: new Date("2022-04-20T08:00:00.000Z"), $lte: new Date("2022-04-27T08:00:00.000Z")}
         }
       }
     ]
     const result = await MongooseTodoWO.aggregate(pipeline).exec();
-    console.log("MongoDB: ", result.length);
+    //console.log("MongoDB: ", result.length);
   }
 
   const mongoEnd = hrtime.bigint();

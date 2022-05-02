@@ -12,7 +12,7 @@ import { Meeting } from './sequelize/models/Meeting';
 
 
 // 50
-const USER_COUNT = 5;
+const USER_COUNT = 275;
 const PROBABILITIES_TAGS_CREATION = [90, 70, 10, 1];
 const PROBABILITIES_TAGS_ADD = [40, 10, 1];
 const PROBABILITIES_TODO_CHILDREN_AT_ROOT = [80, 80, 80, 80, 80, 80, 80, 80, 80, 80];
