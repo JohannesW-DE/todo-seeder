@@ -18,7 +18,7 @@ const userSchemaWO = new Schema<MongoUserWO>(
     name: String,
     email: String,
     tags: [tagSchema],
-    friends: [{ type: Schema.Types.ObjectId, ref: "UserWO" }]
+    friends: [{ type: Schema.Types.ObjectId, ref: "UserWO", index: true }]
   }
 );
 

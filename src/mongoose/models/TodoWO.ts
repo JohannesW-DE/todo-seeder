@@ -27,8 +27,8 @@ const todoSchema = new Schema<MongoTodo>(
     duration: Number,
     user_limit: Number,
     parent: { type: Schema.Types.ObjectId, ref: 'TodoWO' },
-    tags: [Schema.Types.ObjectId],
-    users: [Schema.Types.ObjectId],
+    tags: { type: [Schema.Types.ObjectId], index: true },
+    users: { type: [Schema.Types.ObjectId], index: true },
     user: { type: Schema.Types.ObjectId, ref: 'UserWO' },  
   }
 );
