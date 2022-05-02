@@ -31,6 +31,10 @@ const createTodoToTodo = "MATCH (parent:Todo), (child:Todo) WHERE parent.id = $p
 const createUserToUser = "MATCH (user:User), (friend:User) WHERE user.id = $userId AND friend.id = $friendId CREATE (user)-[r:FRIENDS_WITH]->(friend) RETURN type(r)";
 const createTodoToUser = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id = $todoId CREATE (u)-[r:ASSIGNED_TO]->(t) RETURN type(r)";
 
+const createUserIndex = "CREATE INDEX FOR (user:User) ON (user.id)";
+const createTodoIndex = "CREATE INDEX FOR (tag:Tag) ON (tag.id)";
+const createTagIndex = "CREATE INDEX FOR (todo:Todo) ON (todo.id)";
+
 (async () => {
   try {
     await session.run(deleteAll)
@@ -126,8 +130,13 @@ const createTodoToUser = "MATCH (u:User), (t:Todo) WHERE u.id = $userId AND t.id
         }  
       }   
     }
+
+    // set indexes
+    await session.run(createUserIndex);
+    await session.run(createTagIndex);
+    await session.run(createTodoIndex);
+
   } finally {
     await session.close()
   }
-  await driver.close()
 })();
